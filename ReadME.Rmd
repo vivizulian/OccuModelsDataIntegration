@@ -1,5 +1,5 @@
 ---
-title: "ReadME"
+title: "Material do curso (Dados, códigos, roteiro)"
 author: "Viviane Zulian e André L. Luza"
 date: '2022-07-20'
 output: github_document
@@ -18,4 +18,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ## Material do curso *Mapeamento probabilístico da distribuição de espécies baseado na integração de dados*
+
+Data: 28 - 31/07/2022
+Local: Espaço Multidisciplinar da Universidade Federal de Santa Maria
+Cidade: Silveira Martins, RS
+
 
