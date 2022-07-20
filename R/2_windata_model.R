@@ -490,11 +490,8 @@ save (model2,
 # ------------------------------------------------------ #
 # modelo 2 em linguagem bugs
 
-# criar  um diretorio para receber os modelos em linguagem BUGS
-dir.create("bugs_models")
-
 # escrever modelo
-sink(here ("bugs_models", "model2_NoIntegration_Detection.txt"))
+sink("model2_NoIntegration_Detection.txt")
 cat("
 
     model {
@@ -600,18 +597,19 @@ params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
 
 # GLOBAL MCMC settings
 ## short form
-na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
+na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
+# na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
 
 # run model
 out_model2 <- bugs(data = winbugs.data, 
                   parameters.to.save = params, 
-                  model.file = here ("bugs_models","model2_NoIntegration_Detection.txt"), 
+                  model.file = "model2_NoIntegration_Detection.txt", 
                   inits = inits, 
                   n.chains = nc, 
                   n.thin = nt, 
                   n.iter = ni, 
                   n.burnin = nb,
-                  debug=F,
+                  debug=T,
                   codaPkg=F, 
                   DIC=TRUE, 
                   bugs.directory="C:/Program Files/WinBUGS14/", 
@@ -645,7 +643,7 @@ save (model3, file=here("output","model3_glm.RData"))
 # modelo 3 em BuGS
 
 # escrever modelo
-sink(here ("bugs_models", "model3_aggregation_NoDetection.txt"))
+sink("model3_aggregation_NoDetection.txt")
 cat("
 
     model {
@@ -698,7 +696,7 @@ params <- c("BETA0",
 
 model3_bugs <- bugs(data = win.data, 
                parameters.to.save = params, 
-               model.file = here("bugs_models","model3_aggregation_NoDetection.txt"), 
+               model.file = "model3_aggregation_NoDetection.txt", 
                inits = NULL, 
                n.chains = nc, 
                n.thin = nt, 
@@ -720,7 +718,7 @@ save(model3_bugs,
 # com integracao e deteccao
 
 # write model
-sink(here("bugs_models","model4_integration_grassland_agriculture.txt"))
+sink("model4_integration_grassland_agriculture.txt")
 cat("
 
     model {
@@ -853,7 +851,7 @@ params <- c("BETA0",
 
 model4 <- bugs(data = win.data, 
                               parameters.to.save = params, 
-                              model.file = here("bugs_models","model4_integration_grassland_agriculture.txt"), 
+                              model.file = "model4_integration_grassland_agriculture.txt", 
                               inits = inits, 
                               n.chains = nc, 
                               n.thin = nt, 
@@ -910,7 +908,7 @@ dist.observers <- dist.observers[-which(rownames(dist.observers) %in% sampled$NM
 
 
 # write model
-sink(here("bugs_models","model4_integration_grassland_agriculture_cross.txt"))
+sink("model4_integration_grassland_agriculture_cross.txt")
 cat("
 
     model {
@@ -1094,7 +1092,7 @@ params <- c("BETA0", "BETA.CAMPO", "ALPHA.GBIF","ALPHA.DIST",
 # run model
 model4_cross <- bugs(data = win.data, 
                      parameters.to.save = params, 
-                     model.file = here ("bugs_models","model4_integration_grassland_agriculture_cross.txt"), 
+                     model.file = "model4_integration_grassland_agriculture_cross.txt", 
                      inits = inits, n.chains = nc, n.thin = nt, n.iter = ni, n.burnin = nb, 
                      codaPkg=F, DIC=TRUE, debug=T,
                      bugs.directory="C:/Program Files/WinBUGS14/", program= "WinBUGS")
