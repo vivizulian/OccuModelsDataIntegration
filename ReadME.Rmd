@@ -17,5 +17,5 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 
-## Material do curso **Mapeamento probabilístico da distribuição de espécies baseado na integração de dados**
+## Material do curso *Mapeamento probabilístico da distribuição de espécies baseado na integração de dados*
 

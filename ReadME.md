@@ -7,4 +7,4 @@ Viviane Zulian e André L. Luza
 <!-- badges: start -->
 <!-- badges: end -->
 
-## Material do curso **Mapeamento probabilístico da distribuição de espécies baseado na integração de dados**
+## Material do curso *Mapeamento probabilístico da distribuição de espécies baseado na integração de dados*
