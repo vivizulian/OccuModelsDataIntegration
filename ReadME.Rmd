@@ -1,0 +1,21 @@
+---
+title: "ReadME"
+author: "Viviane Zulian e André L. Luza"
+date: '2022-07-20'
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Material do curso **Mapeamento probabilístico da distribuição de espécies baseado na integração de dados**
+
