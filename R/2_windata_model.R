@@ -231,6 +231,9 @@ agg_ebird_subset <- agg_ebird[which(is.na(agg_ebird$agg_ebird)!=T),]
 model1<- glm (agg_ebird ~ campo + agri,
               data=agg_ebird_subset,
               family=binomial(link = "logit"))
+# media de municipios ocupados
+plogis (model1$coefficients[1])
+
 # save it
 save (model1,file=here("output", "out_model1_glm.RData"))
 
@@ -270,6 +273,9 @@ modSel(fmList, nullmod="null") # selecao de modelos
 save (model2,
       file=here("output", "out_model2_unmarked.RData"))
 
+# proporcao de municipios ocupados
+plogis(coef(model2,"state")[1])
+
 # ------------------------------------------------------ #
 # modelo 2 em linguagem bugs
 
@@ -303,32 +309,68 @@ cat("
     ###### OBSERVATION MODEL #########
     ###################################
 
-    ## EBIRD
-  
+   
     for (i in 1:nsite) {
       for (j in 1:nrepEB) {
 
-        e2[i,j] <- ALPHA.DIST * dist [i,j] +
-                   ALPHA.DURATION * duration [i,j] +
-                   ALPHA.OBSERVER * observer [i,j]
+        #e2[i,j] <- ALPHA.DIST * dist [i,j] +
+        #           ALPHA.DURATION * duration [i,j] +
+        #           ALPHA.OBSERVER * observer [i,j]
  
-        P2[i,j] <- 1-pow((1-0.5), e2[i,j])
-        zP2[i,j] <- P2[i,j] * z [i]
-        yEB [i,j] ~ dbern(zP2[i,j])
+        #P2[i,j] <- 1-pow((1-0.5), e2[i,j])
+        #zP2[i,j] <- P2[i,j] * z [i]
+        #yEB [i,j] ~ dbern(zP2[i,j])
+        
+        yEB [i,j] ~ dbern(muY[i,j])
+        muY[i,j] <- p[i,j] * z [i]
+        logit(p[i,j]) <-  ALPHA + ALPHA.DIST * dist [i,j] + 
+                                  ALPHA.DURATION * duration [i,j] + 
+                                  ALPHA.OBSERVER * observer [i,j]
 
       }
     }
     
-    ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
-    ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
-    ALPHA.OBSERVER  ~ dnorm(0,0.0001)I(0,1000)
+    # priors 
+    ALPHA ~ dnorm (0,0.001)
+    ALPHA.DIST ~ dnorm (0,0.001)
+    ALPHA.DURATION ~ dnorm (0,0.001)
+    ALPHA.OBSERVER ~ dnorm (0,0.001)
+    #ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
+    #ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
+    #ALPHA.OBSERVER  ~ dnorm(0,0.0001)I(0,1000)
 
+
+    # ================================= 
+    # fit statistics
+    # Computation of fit statistic (for Bayesian p-value)
+    # assess modelo fit using chi-squared discrepancy
+    # compute fit statistics for observed data
+    
+     for (i in 1:nsite) {
+      for (j in 1:nrepEB) {
+        #eval[i,j]<-P2[i,j] * z [i]
+        eval[i,j]<-p[i,j] * z [i]
+        
+        E[i,j] <- pow((yEB [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        #y.new[i,j]~dbern (zP2[i,j]) 
+        y.new[i,j]~dbern(z[i]) 
+        E.new[i,j] <- pow((y.new [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        
+      }
+     }
+    
+    # aggregated fit statistics
+    fit<-sum(E[,])# Discrepancy for actual data set
+    fit.new<-sum(E.new[,]) # Discrepancy for replicate data set
+    test<-step(fit.new - fit) # Test whether new data set more extreme
+    bpvalue<-mean(test) # Bayesian p-value
+   
     ##############################
     #### DERIVED PARAMETERS ######
     ##############################
     
     #compute the mean detection probability of each dataset: 
-    muP <- mean(P2[,])
+    #muP <- mean(P2[,])
 
     ## Number of occupied municipalities (finite sample size)
     fs.z <- sum(z[])/nsite
@@ -375,13 +417,15 @@ str(winbugs.data <- list(nsite= dim(y.ebird)[1],
 # parametros para monitorar nas MCMC
 params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
             "BETA0","BETA.CAMPO","BETA.AGRI",
-            "muP","z","psi","fs.z","P2"
+            #"muP",
+            "z","psi","fs.z","p",#"P2",
+            "bpvalue", "fit", "fit.new"
     )
 
 # GLOBAL MCMC settings
 ## short form
 na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
-# na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
+na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
 
 # run model
 out_model2 <- bugs(data = winbugs.data, 
@@ -401,6 +445,8 @@ out_model2 <- bugs(data = winbugs.data,
 # save it
 save (out_model2,file=here("output", "out_model2_bugs.RData"))
 
+out_model2$mean$fs.z
+out_model2$mean$bpvalue
 
 # -----------------------------------------------------
 # modelo 3
@@ -444,7 +490,6 @@ cat("
     for (i in 1:nsite) {
 
       y1[i] ~ dbern(psi[i]) # Assuming y = z at site i
-
       mu[i] <- BETA0 + BETA.CAMPO * campo[i] + # occ model
                        BETA.AGRI * agri [i] 
       mu.lim[i] <- min(10, max(-10, mu[i]))  
@@ -452,6 +497,25 @@ cat("
 
     }    
 
+    # ======================================
+    # goodness of fit
+    # posterior predictive checks
+    for (i in 1:nsite) {
+    
+        residual[i] <- y1[i]-psi[i] # Residuals for observed data
+        predicted[i] <- psi[i] # Predicted values
+        sq[i] <- pow(residual[i], 2) # Squared residuals for observed data
+       
+        # Generate replicate data and compute fit stats for them
+        y.new[i] ~ dbern(psi[i]) # one new data set at each MCMC iteration
+        sq.new[i] <- pow(y.new[i]-predicted[i], 2) # Squared residuals for new data
+    }
+        
+    fit <- sum(sq[]) # Sum of squared residuals for actual data set
+    fit.new <- sum(sq.new[]) # Sum of squared residuals for new data set
+    test <- step(fit.new - fit) # Test whether new data set more extreme
+    bpvalue <- mean(test) # Bayesian p-value
+    
     # proportion of occupied municipalites
     pm <- sum(y1[])/nsite
 
@@ -474,7 +538,10 @@ str(win.data <- list(nsite= nrow (dados_agregados),
 
 params <- c("BETA0", 
             "BETA.CAMPO","BETA.AGRI",
-            "psi","pm"
+            "psi","pm",
+            "fit",
+            "fit.new",
+            "bpvalue"
 )
 
 model3_bugs <- bugs(data = win.data, 
@@ -495,6 +562,10 @@ model3_bugs <- bugs(data = win.data,
 # salvar
 save(model3_bugs,
      file=here("output","model3_bugs.RData"))
+
+# model fit
+model3_bugs$mean$bpvalue
+
 
 # ------------------------------------------------------
 # modelo 4
