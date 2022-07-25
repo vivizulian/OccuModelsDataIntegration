@@ -20,15 +20,20 @@
 
 # carregar os pacotes
 source ('R/packagesR.R')
+source ('R/functions.R')
 
 # carregar dados
 load(here("data","organized_data", "input_GBIF.RData")) ## gbif
 load(here("data","organized_data", "input_ebird.RData")) ## eBird
 load(here("data","organized_data", "input_wikiaves.RData")) # WikiAves
 
+
+
 #-------------------------
 # carregar dados espaciais
 #--------------------------
+
+
 
 # carregar shapefile RS
 # carregar em uma projecao Lambert, para trabalhar adequadamente com areas
@@ -53,9 +58,11 @@ agricultura_uso <- usos_tabela$`Agricultura de sequeiro.area`
 # correlacao
 cor(campo,agricultura_uso)
 
+
 # ---------------------------------------------------------- #
+
 # padronizacoes
-## area de habitat campestre e agricutlura por municipio
+## area de habitat campestre e agricultura por municipio
 ## multiplicar a cobertura de habitat pela area do municipio
 area_campo <- area_mun*campo # para plot
 habitat_campo <- area_mun*campo # para padronizar e ir no modelo 
@@ -66,6 +73,7 @@ habitat_lavoura <- area_mun*agricultura_uso # para padronizar e ir no modelo
 habitat_campo <- decostand (sqrt(habitat_campo),"standardize")
 habitat_lavoura <- decostand (sqrt(habitat_lavoura),"standardize")
 
+
 # CRIAR DIRETORIO PARA HOSPEDAR RESULTADos
 dir.create("output")
 
@@ -74,81 +82,49 @@ save(habitat_campo, area_campo,
      habitat_lavoura,area_lavoura,
      file=here("output", "covariaveis.RData"))
 
-# bind grassland data into the shapefile
-shape_RS@data$campo <- area_campo
-# plot
-cores_campo <- data.frame (cores= sqrt(area_campo),
-                         NM_MUNICIP=shape_RS$NM_MUNICIP)
 
-# fortify
-f.mun<-fortify(shape_RS, region="NM_MUNICIP")
-f.mun_campo<- cbind (f.mun, 
-                   Nespecies = cores_campo [match (f.mun$id, cores_campo$NM_MUNICIP),]$cores)
+# colar area de campo e agricultura no shape
+shape_RS@data$campo <- area_campo # campo
+shape_RS@data$agricultura <- area_lavoura # agricultura
 
-# grassland cover
-# inserir vals
-c_campo <-   ggplot() + geom_polygon(data=f.mun_campo, aes(x=long, y=lat, group=group, 
-                                                color=Nespecies, fill=Nespecies), colour = NA, size=1) + 
-  labs (title= "Area de campo, por municipio") +
-  scale_fill_gradient2 (low='white', high='#206A5D', na.value = "white",
-                        limits=c(0,max(cores_campo$cores)), 
-                        breaks=seq(0,max(cores_campo$cores,na.rm=T),by=500),
-                        name=expression(sqrt("Area (km2)"))) ## para continuo
+# mapa campo
+mapa_campo <- funcao_mapa_variaveis(shape= shape_RS,variavel = shape_RS$campo,
+                      titulo = "Area de Campos Naturais", 
+                      cor.min = "white", 
+                      cor.max = "darkgreen",
+                      cor.na = "gray50")
 
-(c_campo <- c_campo + theme_classic() + 
-    theme (axis.text = element_text(size=6),
-           axis.title = element_text(size=8),
-           legend.text = element_text(size=8),
-           legend.title = element_text(size=9))+
-    xlab("Longitude") + 
-    ylab("Latitude")) 
+# mapa agricultura
+mapa_agricultura <- funcao_mapa_variaveis(shape= shape_RS,variavel = shape_RS$agricultura,
+                      titulo = "Area de Agricultura", 
+                      cor.min = "white", 
+                      cor.max = "darkred",
+                      cor.na = "gray50")
 
-## agricultura
-# bind grassland data into the shape
-shape_RS@data$agricultura <- area_lavoura
-# plot
-cores_agri <- data.frame (cores= sqrt(area_lavoura),
-                         NM_MUNICIP=shape_RS$NM_MUNICIP)
 
-# fortify
-f.mun_agri<- cbind (f.mun, 
-                   Nespecies= cores_agri [match (f.mun$id, cores_agri$NM_MUNICIP),]$cores)
-
-## inserir vals
-c_agri <-   ggplot() + geom_polygon(data=f.mun_agri, aes(x=long, y=lat, group=group, 
-                                                       color=Nespecies, fill=Nespecies), 
-                                   colour = NA, size=1) + 
-  labs (title= "Area de agricultura, por municipio") +
-  scale_fill_gradient2 (low='white', high='#E48900', na.value = "white",
-                        limits=c(0,max(cores_agri$cores)), 
-                        breaks=seq(0,max(cores_agri$cores,na.rm=T),by=500),
-                        name=expression(sqrt("Area (km2)"))) ## para continuo
-
-(c_agri<-c_agri + theme_classic() + 
-    theme (axis.text = element_text(size=6),
-           axis.title = element_text(size=8),
-           legend.text = element_text(size=8),
-           legend.title = element_text(size=9))+
-  xlab("Longitude") + 
-  ylab("Latitude"))
 
 # bind maps and save
 pdf (here ("output", "maps_land_use.pdf"),heigh=7,width=5)
-grid.arrange(c_campo,
-             c_agri)
+grid.arrange(mapa_campo,
+             mapa_agricultura,
+             ncol=2)
 
 dev.off()
 
 # -------------------------------------------------------------------------
+
 # MAPAS DAS OBSERVACOES
 
-# carregar mapa do RS
+
+# carregar mapa do RS (em latlong)
 shape_RS <- readOGR(dsn=here("data","shape_munRS"), 
                     layer="43MUE250GC_SIR",
                     encoding = "UTF-8",use_iconv = T)
 
+
 ## obter os lagos para pinta-los com cores diferentes depois
 lagos <- shape_RS [c(96,250),]
+
 ## remover os lagos
 shape_RS <- shape_RS [-c(96,250),]
 
@@ -157,273 +133,80 @@ southAme<- readOGR(dsn=here ("data","South_America"),encoding="latin1", layer="S
 BR_AR_URU<- southAme [southAme@data$COUNTRY == "Paraguay" | southAme@data$COUNTRY == "Brazil" | southAme@data$COUNTRY == "Argentina" | southAme@data$COUNTRY == "Uruguay", ]
 crs(BR_AR_URU)<-crs(shape_RS)
 
-# fortify RS map
-f.mun<-fortify(shape_RS, region="NM_MUNICIP") # fortify mapa do RS, comum a todos os mapas
+
+# mapa de base (south america and lakes)
 
 ## colocar o shape da america do sul = comum a todos os mapas
-a <- ggplot() + geom_polygon (data=BR_AR_URU, aes(x=long, y=lat, group=group),size = 0.1, fill="gray90", colour="gray75",alpha=1) +
-  coord_fixed (xlim = c(-57.5, -49),  ylim = c(-34, -27), ratio = 1) 
+a <- ggplot() + geom_polygon (data=BR_AR_URU, aes(x=long, 
+                                                  y=lat, 
+                                                  group=group),
+                              size = 0.1, fill="gray90", 
+                              colour="gray75",alpha=1) +
+  coord_fixed (xlim = c(-57.5, -49),  
+               ylim = c(-34, -27), 
+               ratio = 1) 
 
 ## inserir os lagos = comum a todos os mapas
-b <- a + geom_polygon (data=lagos,aes(x=long, y=lat, group=group), 
-                       fill="lightcyan",colour = "lightcyan", size=1)
+b <- a + geom_polygon (data=lagos, aes(x=long, 
+                                       y=lat, 
+                                       group=group), 
+                       fill="lightcyan",
+                       colour = "lightcyan", 
+                       size=1)
+
 
 ## abrir deteccoes do eBird
 load (here("data","organized_data",  "input_ebird.RData"))## gbif
+
+# observacoes
 ebird_rhea <- apply (y.ebird, 1, max,na.rm=T) # 
-
-## mapas das deteccoes
-cores_ebird <- data.frame (cores= ebird_rhea,
-                           NM_MUNICIP=shape_RS$NM_MUNICIP)
-# escala discreta
-cores_ebird$cores <- factor(cores_ebird$cores)
-levels(cores_ebird$cores) [which(levels (cores_ebird$cores) == 0)] <- "Not detected"
-levels(cores_ebird$cores) [which(levels (cores_ebird$cores) == 1)] <- "Detected"
-levels(cores_ebird$cores) [which(levels (cores_ebird$cores) == -Inf)] <- "Not sampled"
-
-# fortify
-f.mun_ebird<- cbind (f.mun, 
-                     Nespecies= cores_ebird [match (f.mun$id, 
-                                                    cores_ebird$NM_MUNICIP),]$cores)
-
-## inserir deteccoes do eBird
-c_ebird <-   b + geom_polygon(data=f.mun_ebird, aes(x=long, y=lat, group=group, 
-                                                    color=Nespecies, fill=Nespecies), 
-                              colour=NA,size=1) + 
-  labs (title= "eBird") +
-  scale_fill_manual("Observation data",
-                    values = c("Not detected" = "white",
-                               "Detected" = "darkred",
-                               "Not sampled" = "gray85"))
-
-# anotar
-e_ebird <- c_ebird + ggsn::scalebar(f.mun_ebird, dist = 100, st.dist=0.03,st.size=2.2, height=0.02, 
-                                    transform = TRUE, dist_unit = "km",
-                                    model = 'WGS84', location = "bottomright")
-
-## plot para extrair a legenda
-f_ebird_legend <- e_ebird +
-  xlab("Longitude") + ylab("Latitude") +
-  theme(panel.border = element_blank(), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "lightcyan", 
-                                        colour = "lightcyan", 
-                                        size = 0.5, 
-                                        linetype = "solid"),
-        
-        legend.title = element_text(size=9),
-        legend.text = element_text(size=7),
-        legend.key.width=unit(0.85,"cm"),
-        legend.key.size = unit(0.40,"cm"),
-        legend.position = "top",
-        legend.justification = 0.5,
-        legend.direction="horizontal",
-        legend.box="horizontal",
-        axis.text=element_text(size=3),
-        axis.text.x = element_text(size=3),
-        axis.title.x = element_text(size = 5),
-        axis.text.y = element_text(size=3),
-        axis.title.y = element_text(size = 5),
-        plot.title = element_text(size=8),
-        plot.margin = unit(c(0.1, -0.1,-0.1, 0.2), "lines")) 
-#        legend.margin = margin (0,0,0,0),
-#       legend.box.margin = margin(1,0,0,0)) +
-
-f_ebird_legend
-
-## funcao para capturar legenda
-get_legend<-function(myggplot){
-  tmp <- ggplot_gtable(ggplot_build(myggplot))
-  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-  legend <- tmp$grobs[[leg]]
-  return(legend)
-}
-
-## extrair legenda usando a funcao anterior
-legenda_comum_data <- get_legend(f_ebird_legend)
-
-## plot para o painel (sem a legenda)  
-f_ebird <- e_ebird + 
-  xlab("Longitude") + ylab("Latitude") +
-  theme(panel.border = element_blank(), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        legend.position = "none", 
-        panel.background = element_rect(fill = "lightcyan", 
-                                        colour = "lightcyan", 
-                                        size = 0.5, 
-                                        linetype = "solid"),
-        plot.title = element_text(size=9),
-        legend.title = element_blank(),
-        legend.text = element_blank(),
-        legend.key.width=unit(0.4,"cm"),
-        legend.key.size = unit(0.5,"cm"),
-        axis.text=element_text(size=5),
-        axis.text.x = element_text(size=5),
-        axis.title.x = element_text(size = 8),
-        axis.text.y = element_text(size=5),
-        axis.title.y = element_text(size = 8),
-        plot.margin = unit(c(-0.1,-0.1, -3.9, 0.05), "lines"))
-# top, right, bottom, and left margins
-
-# anota o norte
-f_north_ebird <- f_ebird + ggsn::north(f.mun_ebird, symbol=1,scale = 0.2,location = "bottomleft") +
-  theme(legend.text=element_text(size=7),
-        legend.title=element_text(size=8))
-
-f_north_ebird
+map_ebird <- funcao_mapa_observacoes (shape = shape_RS, observacoes = ebird_rhea, titulo="eBird")
 
 ## abrir deteccoes GIBF
 load (here("data","organized_data", "input_GBIF.RData"))## gbif
-
-## mapas das deteccoes
-cores_gbif <- data.frame (cores= dados_det_ema_gbif$det,
-                          NM_MUNICIP=shape_RS$NM_MUNICIP)
-cores_gbif$cores [which (dados_det_ema_gbif$riqueza_aves == 0)] <- NA
-
-# fortify
-f.mun_gbif<- cbind (f.mun, 
-                    Nespecies= cores_gbif [match (f.mun$id, 
-                                                  cores_gbif$NM_MUNICIP),]$cores)
-
-## inserir deteccoes do GBIF
-c_gbif <-   b + geom_polygon(data=f.mun_gbif, aes(x=long, y=lat, group=group, 
-                                                  color=Nespecies, fill=Nespecies), 
-                             colour = NA, size=1) + 
-  labs (title= "GBIF") +
-  scale_fill_gradient2 (low='white', 
-                        high='darkred', 
-                        midpoint= 0.20,na.value = "gray85",
-                        limits=c(0,1), 
-                        #breaks=seq(0,max(cores_50km$cores,na.rm=T),by=0.2),
-                        name="Detected") ## para continuo
-
-
-f_gbif <- c_gbif + 
-  xlab("") + ylab("") +
-  theme(panel.border = element_blank(), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "lightcyan", 
-                                        colour = "lightcyan", 
-                                        size = 0.5, 
-                                        linetype = "solid"),
-        plot.title = element_text(size=9),
-        legend.title = element_blank(),
-        legend.text = element_blank(),
-        legend.position = "none",
-        axis.text=element_text(size=3),
-        axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 4),
-        axis.text.y = element_blank(),
-        axis.title.y = element_text(size = 4),
-        axis.ticks = element_blank(),
-        plot.margin = unit(c(0.2,-0.1, -3, -0.1), "lines")) # top, right, bottom, and left margins
+map_gbif <- funcao_mapa_observacoes (shape = shape_RS, 
+                         observacoes = dados_det_ema_gbif$det, 
+                         titulo="GBIF")
 
 
 ## abrir deteccoes wikiaves
 load (here("data","organized_data", "input_wikiaves.RData"))
+map_wikiaves <- funcao_mapa_observacoes (shape = shape_RS, 
+                         observacoes = dados_wikiaves$RHAMERICANA, 
+                         titulo="WikiAves")
 
-## mapas das deteccoes
-cores_wiki <- data.frame (cores= dados_wikiaves$RHAMERICANA,
-                          NM_MUNICIP=shape_RS$NM_MUNICIP)
-cores_wiki$cores [which (dados_wikiaves$NSPECIES == 0)] <- NA
-
-# fortity
-f.mun_wiki <- cbind (f.mun, 
-                     Nespecies= cores_wiki [match (f.mun$id, 
-                                                   cores_wiki$NM_MUNICIP),]$cores)
-
-## inserir deteccoes do GBIF
-c_wiki <-   b + geom_polygon(data=f.mun_wiki, aes(x=long, y=lat, group=group, 
-                                                  color=Nespecies, fill=Nespecies), 
-                             colour = NA, size=1) + 
-  labs (title= "Wikiaves") +
-  scale_fill_gradient2 (low='white', high='darkred', midpoint= 0.20,na.value = "gray85",
-                        limits=c(0,1), 
-                        #breaks=seq(0,max(cores_50km$cores,na.rm=T),by=0.2),
-                        name="Detected") ## para continuo
-
-f_wiki <- c_wiki +
-  xlab("") + ylab("") +
-  theme(panel.border = element_blank(), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "lightcyan", 
-                                        colour = "lightcyan", 
-                                        size = 0.5, 
-                                        linetype = "solid"),
-        plot.title = element_text(size=9),
-        legend.title = element_blank(),
-        legend.text = element_blank(),
-        legend.position = "none",
-        axis.text=element_text(size=3),
-        axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 4),
-        axis.text.y = element_blank(),
-        axis.title.y = element_text(size = 4),
-        axis.ticks = element_blank(),
-        plot.margin = unit(c(0.2,0, -3, -0.1), "lines"))# top, right, bottom, and left margins
-
-## concenso entre as bases
-
+# dados agregados
 cores_agregado <- data.frame(eBird=ebird_rhea, 
-                             GBIF=cores_gbif$cores, 
-                             WikiAves=cores_wiki$cores)
-
+                             GBIF=dados_det_ema_gbif$det, 
+                             WikiAves=dados_wikiaves$RHAMERICANA)
+# agregar
+agg_data <- apply(cores_agregado, 1, max,na.rm=T)## municipios com deteccoes
 apply(cores_agregado, 2, function (i) sum (i > 0,na.rm=T))## numero de deteccoes por base
 table(apply (cores_agregado,1,max,na.rm=T)>0) # numero de municipios com deteccao e sem deteccao
 
-# cores para o mapa agregado
-cores_agregado <- data.frame (cores= apply (cores_agregado,1,max,na.rm=T),
-                              NM_MUNICIP=shape_RS$NM_MUNICIP)
-
-#fortify
-f.mun_con <- cbind (f.mun, 
-                    Nespecies= cores_agregado [match (f.mun$id, 
-                                                      cores_agregado$NM_MUNICIP),]$cores)
-
 # mapa
-c_con <-   b + geom_polygon(data=f.mun_con, aes(x=long, y=lat, group=group, 
-                                                color=Nespecies, fill=Nespecies), 
-                            colour = NA, size=1) + 
-  labs (title= "Agregado das bases") +
-  scale_fill_gradient2 (low='white', 
-                        high='darkred', 
-                        midpoint= 0.20,na.value = "gray85",
-                        limits=c(0,1), 
-                        #breaks=seq(0,max(cores_50km$cores,na.rm=T),by=0.2),
-                        name="Detected") ## para continuo
-f_con<- c_con +
-  xlab("") + ylab("") +
-  theme(panel.border = element_blank(), 
-        panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(),
-        panel.background = element_rect(fill = "lightcyan", 
-                                        colour = "lightcyan", 
-                                        size = 0.5, 
-                                        linetype = "solid"),
-        plot.title = element_text(size=9),
-        legend.title = element_blank(),
-        legend.text = element_blank(),
-        legend.position = "none",
-        axis.text=element_text(size=3),
-        axis.text.x = element_blank(),
-        axis.title.x = element_text(size = 4),
-        axis.text.y = element_blank(),
-        axis.title.y = element_text(size = 4),
-        axis.ticks = element_blank(),
-        plot.margin = unit(c(-5,0, 0, -0.1), "lines"))# top, right, bottom, and left margins
+map_agg <- funcao_mapa_observacoes (shape = shape_RS, 
+                         observacoes = agg_data, 
+                         titulo="Agregado")
+
+# uma unica legenda
+legenda_comum_data <- get_legend (map_agg)
 
 ######### arranjar o painel
 pdf(file=here ("output","maps_observations.pdf"),width = 7,height = 5,family="serif")
 
-grid.arrange(f_north_ebird, f_gbif,f_wiki,f_con,
-             legenda_comum_data,
-             ncol=4,nrow=2,
-             layout_matrix = rbind(c(1,2,3,4), 
-                                   c(5,5,5,5))) 
+grid.arrange(legenda_comum_data,
+             map_agg + theme(legend.position = "none"), 
+             map_ebird+ theme(legend.position = "none"),
+             map_gbif+ theme(legend.position = "none"),
+             map_wikiaves+ theme(legend.position = "none"),
+             ncol=5,nrow=6,
+             layout_matrix = rbind(c(1,1,1,1,1), 
+                                   c(2,2,2,2,2),
+                                   c(2,2,2,2,2),
+                                   c(2,2,2,2,2),
+                                   c(NA,3,4,5,NA),
+                                   c(NA,3,4,5,NA))) 
 dev.off()
 
 
