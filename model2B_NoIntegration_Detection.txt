@@ -1,0 +1,87 @@
+
+
+    model {
+    
+    ###################################
+    ###### ECOLOGICAL MODEL ###########
+    ###################################
+    
+    BETA0 ~ dunif(-10,10)
+    BETA.CAMPO ~ dunif(-10,10)
+    BETA.AGRI ~ dunif(-10,10)
+    
+    # LIKELIHOOD
+    for (i in 1:nsite) {
+
+      z[i] ~ dbern(psi[i]) # True occupancy z at site i
+      mu[i] <- BETA0 + BETA.CAMPO * campo[i] + # occ model
+                      BETA.AGRI * agri [i] 
+                      
+      mu.lim[i] <- min(10, max(-10, mu[i]))  
+      logit(psi[i]) <- mu.lim[i]
+
+    }    
+
+    ###################################
+    ###### OBSERVATION MODEL #########
+    ###################################
+
+   
+    for (i in 1:nsite) {
+      for (j in 1:nrepEB) {
+
+        e2[i,j] <- ALPHA.DIST * dist [i,j] +
+                   ALPHA.DURATION * duration [i,j] +
+                   ALPHA.OBSERVER * observer [i,j]
+ 
+        P2[i,j] <- 1-pow((1-0.5), e2[i,j])
+        zP2[i,j] <- P2[i,j] * z [i]
+        yEB [i,j] ~ dbern(zP2[i,j])
+        
+      
+
+      }
+    }
+    
+    # priors 
+    
+    ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
+    ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
+    ALPHA.OBSERVER  ~ dnorm(0,0.0001)I(0,1000)
+
+
+    # ================================= 
+    # fit statistics
+    # Computation of fit statistic (for Bayesian p-value)
+    # assess modelo fit using chi-squared discrepancy
+    # compute fit statistics for observed data
+    
+     for (i in 1:nsite) {
+      for (j in 1:nrepEB) {
+        eval[i,j]<-P2[i,j] * z [i]
+        E[i,j] <- pow((yEB [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        y.new[i,j]~dbern (zP2[i,j]) 
+        E.new[i,j] <- pow((y.new [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        
+      }
+     }
+    
+    # aggregated fit statistics
+    fit<-sum(E[,])# Discrepancy for actual data set
+    fit.new<-sum(E.new[,]) # Discrepancy for replicate data set
+    test<-step(fit.new - fit) # Test whether new data set more extreme
+    bpvalue<-mean(test) # Bayesian p-value
+   
+    ##############################
+    #### DERIVED PARAMETERS ######
+    ##############################
+    
+    #compute the mean detection probability of each dataset: 
+    muP <- mean(P2[,])
+
+    ## Number of occupied municipalities (finite sample size)
+    fs.z <- sum(z[])/nsite
+    
+
+    } ## end of the model
+    

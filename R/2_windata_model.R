@@ -231,7 +231,7 @@ agg_ebird_subset <- agg_ebird[which(is.na(agg_ebird$agg_ebird)!=T),]
 model1<- glm (agg_ebird ~ campo + agri,
               data=agg_ebird_subset,
               family=binomial(link = "logit"))
-# media de municipios ocupados
+# proporcao de municipios ocupados
 plogis (model1$coefficients[1])
 
 # save it
@@ -417,8 +417,7 @@ str(winbugs.data <- list(nsite= dim(y.ebird)[1],
 # parametros para monitorar nas MCMC
 params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
             "BETA0","BETA.CAMPO","BETA.AGRI",
-            #"muP",
-            "z","psi","fs.z","p",#"P2",
+            "z","psi","fs.z","p",
             "bpvalue", "fit", "fit.new"
     )
 
@@ -447,6 +446,156 @@ save (out_model2,file=here("output", "out_model2_bugs.RData"))
 
 out_model2$mean$fs.z
 out_model2$mean$bpvalue
+
+# modelo 2B, com modelo de deteccao alternativo (parecido com IDM)
+
+
+# escrever modelo
+sink("model2B_NoIntegration_Detection.txt")
+cat("
+
+    model {
+    
+    ###################################
+    ###### ECOLOGICAL MODEL ###########
+    ###################################
+    
+    BETA0 ~ dunif(-10,10)
+    BETA.CAMPO ~ dunif(-10,10)
+    BETA.AGRI ~ dunif(-10,10)
+    
+    # LIKELIHOOD
+    for (i in 1:nsite) {
+
+      z[i] ~ dbern(psi[i]) # True occupancy z at site i
+      mu[i] <- BETA0 + BETA.CAMPO * campo[i] + # occ model
+                      BETA.AGRI * agri [i] 
+                      
+      mu.lim[i] <- min(10, max(-10, mu[i]))  
+      logit(psi[i]) <- mu.lim[i]
+
+    }    
+
+    ###################################
+    ###### OBSERVATION MODEL #########
+    ###################################
+
+   
+    for (i in 1:nsite) {
+      for (j in 1:nrepEB) {
+
+        e2[i,j] <- ALPHA.DIST * dist [i,j] +
+                   ALPHA.DURATION * duration [i,j] +
+                   ALPHA.OBSERVER * observer [i,j]
+ 
+        P2[i,j] <- 1-pow((1-0.5), e2[i,j])
+        zP2[i,j] <- P2[i,j] * z [i]
+        yEB [i,j] ~ dbern(zP2[i,j])
+        
+      
+
+      }
+    }
+    
+    # priors 
+    
+    ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
+    ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
+    ALPHA.OBSERVER  ~ dnorm(0,0.0001)I(0,1000)
+
+
+    # ================================= 
+    # fit statistics
+    # Computation of fit statistic (for Bayesian p-value)
+    # assess modelo fit using chi-squared discrepancy
+    # compute fit statistics for observed data
+    
+     for (i in 1:nsite) {
+      for (j in 1:nrepEB) {
+        eval[i,j]<-P2[i,j] * z [i]
+        E[i,j] <- pow((yEB [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        y.new[i,j]~dbern (zP2[i,j]) 
+        E.new[i,j] <- pow((y.new [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
+        
+      }
+     }
+    
+    # aggregated fit statistics
+    fit<-sum(E[,])# Discrepancy for actual data set
+    fit.new<-sum(E.new[,]) # Discrepancy for replicate data set
+    test<-step(fit.new - fit) # Test whether new data set more extreme
+    bpvalue<-mean(test) # Bayesian p-value
+   
+    ##############################
+    #### DERIVED PARAMETERS ######
+    ##############################
+    
+    #compute the mean detection probability of each dataset: 
+    muP <- mean(P2[,])
+
+    ## Number of occupied municipalities (finite sample size)
+    fs.z <- sum(z[])/nsite
+    
+
+    } ## end of the model
+    ",fill = TRUE)
+sink()
+
+
+## initial values
+set.seed(32)
+zint <- apply (y.ebird,1,max,na.rm=T)
+zint[is.infinite(zint)]<- 0
+inits = function() {list(z = zint,
+                         ALPHA.DIST = rnorm (1,mean=2),
+                         ALPHA.DURATION = rnorm (1,mean=20),
+                         ALPHA.OBSERVER = rnorm (1,mean=2))}
+
+# bound data
+str(winbugs.data <- list(nsite= dim(y.ebird)[1],
+                         yEB = y.ebird [,1:n_so_ebird],
+                         dist = dist.ebird [,1:n_so_ebird],
+                         duration = dist.duration [,1:n_so_ebird],
+                         observer = dist.observers [,1:n_so_ebird],
+                         nrepEB = ncol(dist.observers [,1:n_so_ebird]),
+                         campo=habitat_campo[,1],
+                         agri=habitat_lavoura[,1]
+))
+
+# parametros para monitorar nas MCMC
+params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
+            "BETA0","BETA.CAMPO","BETA.AGRI",
+            "muP",
+            "z","psi","fs.z","P2",
+            "bpvalue", "fit", "fit.new"
+)
+
+# GLOBAL MCMC settings
+## short form
+na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
+na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
+
+# run model
+out_model2B <- bugs(data = winbugs.data, 
+                   parameters.to.save = params, 
+                   model.file = "model2B_NoIntegration_Detection.txt", 
+                   inits = inits, 
+                   n.chains = nc, 
+                   n.thin = nt, 
+                   n.iter = ni, 
+                   n.burnin = nb,
+                   debug=T,
+                   codaPkg=F, 
+                   DIC=TRUE, 
+                   bugs.directory="C:/Program Files/WinBUGS14/", 
+                   program= "WinBUGS")
+
+# save it
+save (out_model2B,file=here("output", "out_model2B_bugs.RData"))
+
+out_model2B$mean$fs.z
+out_model2B$mean$bpvalue
+
 
 # -----------------------------------------------------
 # modelo 3
