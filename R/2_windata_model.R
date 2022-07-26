@@ -838,7 +838,7 @@ str(win.data <- list(nsite= dim(dados_det_ema_gbif)[1],
 
 # initial values
 set.seed(32)
-inits = function() {list(z = rep (1, nrow(y.ebird)),
+inits <- function() {list(z = rep (1, nrow(y.ebird)),
                          ALPHA.DIST = rnorm (1,mean=2),
                          ALPHA.DURATION = rnorm (1,mean=20),
                          ALPHA.OBSERVER = rnorm (1,mean=2))}
@@ -870,8 +870,80 @@ model4 <- bugs(data = win.data,
 # save it
 save (model4,file=here("output", "model4_bugs.RData"))
 
+
+model4$mean$fs.z
+
+
 # Pstar
 source ('R/4_Pstar.R')
+
+
+
+# -------------------------------------------------------------------------------
+
+# bound data
+
+y <- list (dados_det_ema_gbif[,"det"],
+           dados_wikiaves [, "RHAMERICANA"],
+           #ifelse (apply (y.ebird,1,sum,na.rm=T)>0,1,apply (y.ebird,1,sum,na.rm=T))
+           y.ebird [which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11]
+           )
+# list of sites           
+sites <- list (seq (1,length(rownames(dados_det_ema_gbif))),
+               seq (1,length(rownames(dados_det_ema_gbif))),
+               which(rowSums(is.na(y.ebird[,1:11])) < 11))
+
+# detection covariates
+det.covs <- list ()
+det.covs [[1]] <- list (nSP.gbif = as.numeric(scale (dados_det_ema_gbif [,"riqueza_aves"])))
+det.covs [[2]] <- list (nPIC.wikiaves = as.numeric(scale (dados_wikiaves [, "NPIC"])),
+                        nSONG.wikiaves = as.numeric(scale (dados_wikiaves [, "NSONG"])))
+#det.covs [[3]] <- list (duration = as.numeric(scale (apply (dist.duration,1,sum) )))
+det.covs [[3]] <- list (duration = (scale ( (dist.duration) ))[which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11],
+                        dist = (scale ( (dist.ebird) ))[which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11],
+                        observer = (scale ( (dist.observers) ))[which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11])
+# site cov
+
+site.cov <- matrix (habitat_campo[,1])
+colnames (site.cov)<-"grassland"
+
+# list of data
+data.list <- list (y = y,
+                   occ.covs = site.cov,
+                   det.covs = det.covs,
+                   sites = sites)
+
+# initial values
+set.seed(32)
+inits <- list(z = rep (1, length(sites[[1]])),
+              beta = list (2),
+              alpha = list (rnorm (1,mean=2),
+                            rnorm (1,mean=20),
+                            rnorm (1,mean=2))
+              )
+
+# Priors
+prior.list <- list(beta.normal = list(mean = 0, var = 2.72), 
+                   alpha.normal = list(mean = list(0, 0, 0), 
+                                       var = list(2.72, 2.72, 2.72)))
+# using the spOccupancy package of R
+
+model4_spOcc <- intPGOcc(occ.formula = ~ grassland, 
+                         det.formula = list (f.1 = ~ nSP.gbif,
+                                             f.2 = ~ nPIC.wikiaves+nSONG.wikiaves,
+                                             f.3 = ~ duration+dist+observer), 
+                         data = data.list, 
+                         inits = inits, 
+                         priors = prior.list, 
+                         n.samples =ni-nb, 
+                         n.omp.threads = nc, 
+                         verbose = TRUE, 
+                         n.burn = nb, 
+                         n.thin = nt, 
+                         n.chains = nc)
+
+summary (model4_spOcc)
+plogis(-1.9334)
 
 # -----------------------
 # model com implementacao de validacao cruzada para avaliacao de ajuste do modelo

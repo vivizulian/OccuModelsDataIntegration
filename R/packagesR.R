@@ -42,6 +42,7 @@ require(vegan)
 
 # modelos hierarquicos no unmarked
 require(unmarked)
+require("spOccupancy")
 
 # curvas AUC
 require(pROC)
