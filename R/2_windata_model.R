@@ -279,6 +279,14 @@ plogis(coef(model2,"state")[1])
 # ------------------------------------------------------ #
 # modelo 2 em linguagem bugs
 
+
+# GLOBAL MCMC settings
+## short form
+# na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
+na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
+
+
+
 # escrever modelo
 sink("model2_NoIntegration_Detection.txt")
 cat("
@@ -313,13 +321,6 @@ cat("
     for (i in 1:nsite) {
       for (j in 1:nrepEB) {
 
-        #e2[i,j] <- ALPHA.DIST * dist [i,j] +
-        #           ALPHA.DURATION * duration [i,j] +
-        #           ALPHA.OBSERVER * observer [i,j]
- 
-        #P2[i,j] <- 1-pow((1-0.5), e2[i,j])
-        #zP2[i,j] <- P2[i,j] * z [i]
-        #yEB [i,j] ~ dbern(zP2[i,j])
         
         yEB [i,j] ~ dbern(muY[i,j])
         muY[i,j] <- p[i,j] * z [i]
@@ -335,11 +336,7 @@ cat("
     ALPHA.DIST ~ dnorm (0,0.001)
     ALPHA.DURATION ~ dnorm (0,0.001)
     ALPHA.OBSERVER ~ dnorm (0,0.001)
-    #ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
-    #ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
-    #ALPHA.OBSERVER  ~ dnorm(0,0.0001)I(0,1000)
-
-
+    
     # ================================= 
     # fit statistics
     # Computation of fit statistic (for Bayesian p-value)
@@ -348,11 +345,8 @@ cat("
     
      for (i in 1:nsite) {
       for (j in 1:nrepEB) {
-        #eval[i,j]<-P2[i,j] * z [i]
         eval[i,j]<-p[i,j] * z [i]
-        
         E[i,j] <- pow((yEB [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
-        #y.new[i,j]~dbern (zP2[i,j]) 
         y.new[i,j]~dbern(z[i]) 
         E.new[i,j] <- pow((y.new [i,j]-eval[i,j]),2)/(eval[i,j]+0.5)
         
@@ -369,9 +363,6 @@ cat("
     #### DERIVED PARAMETERS ######
     ##############################
     
-    #compute the mean detection probability of each dataset: 
-    #muP <- mean(P2[,])
-
     ## Number of occupied municipalities (finite sample size)
     fs.z <- sum(z[])/nsite
     
@@ -421,10 +412,6 @@ params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
             "bpvalue", "fit", "fit.new"
     )
 
-# GLOBAL MCMC settings
-## short form
-na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
-na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
 
 # run model
 out_model2 <- bugs(data = winbugs.data, 
@@ -435,7 +422,7 @@ out_model2 <- bugs(data = winbugs.data,
                   n.thin = nt, 
                   n.iter = ni, 
                   n.burnin = nb,
-                  debug=T,
+                  debug=F,
                   codaPkg=F, 
                   DIC=TRUE, 
                   bugs.directory="C:/Program Files/WinBUGS14/", 
@@ -446,6 +433,27 @@ save (out_model2,file=here("output", "out_model2_bugs.RData"))
 
 out_model2$mean$fs.z
 out_model2$mean$bpvalue
+
+# high density interval
+hpd_vals <- HPDinterval(as.mcmc(out_model2$sims.list$ALPHA.DIST), prob=0.95)
+
+ggplot () + 
+  geom_density(data = data.frame (y=out_model2$sims.list$ALPHA.DIST),
+               aes (x=y),fill="red",alpha =0.3)+
+  geom_segment(aes(x = hpd_vals[1], 
+                   y = 0, 
+                   xend = hpd_vals[2], 
+                   yend = 0),
+               size=5,col="#5A8F7B") + 
+  geom_segment(aes(x = out_model2$mean$ALPHA.DIST, 
+                   y = 0, 
+                   xend = out_model2$mean$ALPHA.DIST, 
+                   yend = 0.018),
+               size=3,col="#5A8F7B") 
+  
+
+
+# =======================================================
 
 # modelo 2B, com modelo de deteccao alternativo (parecido com IDM)
 
@@ -570,11 +578,6 @@ params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
             "bpvalue", "fit", "fit.new"
 )
 
-# GLOBAL MCMC settings
-## short form
-na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
-na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
-
 # run model
 out_model2B <- bugs(data = winbugs.data, 
                    parameters.to.save = params, 
@@ -616,8 +619,12 @@ model3 <- glm (rhea ~ campo+agri,
 
 # salvar
 save (model3, file=here("output","model3_glm.RData"))
+summary(model3)
 
-# --------
+# ----------------------------------------------------------------
+
+
+
 # modelo 3 em BuGS
 
 # escrever modelo
@@ -672,11 +679,13 @@ cat("
     ",fill = TRUE)
 sink()
 
+
 ## initial values
 set.seed(32)
 inits = function() {list(BETA0=runif(1),
                          BETA.CAMPO=runif(1),
                          BETA.AGRI=runif(1))}
+
 
 # bound data
 str(win.data <- list(nsite= nrow (dados_agregados),
@@ -684,6 +693,7 @@ str(win.data <- list(nsite= nrow (dados_agregados),
                      campo = dados_agregados$campo,
                      agri = dados_agregados$agri
 ))
+
 
 params <- c("BETA0", 
             "BETA.CAMPO","BETA.AGRI",
@@ -713,6 +723,7 @@ save(model3_bugs,
      file=here("output","model3_bugs.RData"))
 
 # model fit
+model3_bugs$mean$pm
 model3_bugs$mean$bpvalue
 
 
@@ -873,13 +884,16 @@ save (model4,file=here("output", "model4_bugs.RData"))
 
 model4$mean$fs.z
 
-
 # Pstar
 source ('R/4_Pstar.R')
 
 
 
 # -------------------------------------------------------------------------------
+
+
+
+# example using the sppOccupancy package of R
 
 # bound data
 
@@ -904,8 +918,8 @@ det.covs [[3]] <- list (duration = (scale ( (dist.duration) ))[which(rowSums(is.
                         observer = (scale ( (dist.observers) ))[which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11])
 # site cov
 
-site.cov <- matrix (habitat_campo[,1])
-colnames (site.cov)<-"grassland"
+site.cov <- as.matrix (cbind (habitat_campo[,1], habitat_lavoura[,1]))
+colnames (site.cov)<-c("grassland", "agriculture")
 
 # list of data
 data.list <- list (y = y,
@@ -928,14 +942,14 @@ prior.list <- list(beta.normal = list(mean = 0, var = 2.72),
                                        var = list(2.72, 2.72, 2.72)))
 # using the spOccupancy package of R
 
-model4_spOcc <- intPGOcc(occ.formula = ~ grassland, 
+model4_spOcc <- intPGOcc(occ.formula = ~ grassland+agriculture, 
                          det.formula = list (f.1 = ~ nSP.gbif,
                                              f.2 = ~ nPIC.wikiaves+nSONG.wikiaves,
                                              f.3 = ~ duration+dist+observer), 
                          data = data.list, 
                          inits = inits, 
                          priors = prior.list, 
-                         n.samples =ni-nb, 
+                         n.samples =ni, 
                          n.omp.threads = nc, 
                          verbose = TRUE, 
                          n.burn = nb, 
@@ -943,7 +957,12 @@ model4_spOcc <- intPGOcc(occ.formula = ~ grassland,
                          n.chains = nc)
 
 summary (model4_spOcc)
-plogis(-1.9334)
+
+# save it
+save (model4_spOcc,file=here("output", 
+                             "model4_spOcc.RData"))
+
+
 
 # -----------------------
 # model com implementacao de validacao cruzada para avaliacao de ajuste do modelo
@@ -1172,6 +1191,7 @@ model4_cross <- bugs(data = win.data,
                      codaPkg=F, DIC=TRUE, debug=T,
                      bugs.directory="C:/Program Files/WinBUGS14/", program= "WinBUGS")
 save(model4_cross,
+     sampled, # é bom salvar a porcao dos dados utilizados para a validacao do modelo
      file=here ("output", "model4_cross.RData"))
 
 # -----------------------

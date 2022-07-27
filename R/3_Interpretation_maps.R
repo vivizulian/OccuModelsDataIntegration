@@ -9,10 +9,13 @@ source ('R/packagesR.R')
 # abrir resultados dos modelos
 load (here("output", "out_model1_glm.RData")) #     1 - modelos sem integracao, e sem consideracao de esforco amostral (eBird) - GLM
 load (here("output", "out_model2_unmarked.RData")) #     2 - modelos sem integracao, e consideracao de esforco amostral (eBird) - HM 'unmarked'
-load (here("output", "out_model2_bugs.RData")) #     2 - modelos sem integracao, e consideracao de esforco amostral (eBird) - HM BUGS
+load (here("output", "out_model2_bugs.RData")) #     2 - modelos sem integracao, e consideracao de esforco amostral (eBird) da forma mais usual (GLM) - HM BUGS
+load (here("output", "out_model2B_bugs.RData")) #     2B - modelos sem integracao, e consideracao de esforco amostral (eBird) - HM BUGS
 load (here("output", "model3_glm.RData")) #     3 - modelos integracao (agregacao), e sem esforco amostral (eBird) - GLM
 load (here("output", "model3_bugs.RData")) #     3 - modelos integracao (agregacao), e sem esforco amostral (eBird) - BUGS
 load (here("output", "model4_bugs.RData")) #      4 - modelos com integracao, e consideracao de esforco amostral (eBird, GBIF, WikiAves) - BUGS
+load (here("output", "model4_spOcc.RData")) #      4 - modelos com integracao, e consideracao de esforco amostral (eBird, GBIF, WikiAves) - usando o pacote sppOccypancy
+load (here("output", "model4_cross.RData")) #      4 - modelos com integracao, e consideracao de esforco amostral (eBird, GBIF, WikiAves) - BUGS, e usando cross-validation
 
 # abrir dados das covariaveis
 load (here("output", "covariaveis.RData")) #      4 - modelos com integracao, e consideracao de esforco amostral (eBird, GBIF, WikiAves) - BUGS
@@ -28,10 +31,14 @@ m2<-cbind( coef(model2,"state"),
        confint(model2, type='state', method = 'normal'),
        model = "NoIntegration,Detection"
 )
-# modelo 2 BUGS
-m2B<-cbind(
+# modelo 2 BUGS - deteccao GLM
+m2Bugs<-cbind(
   out_model2$summary[grep("BETA",rownames(out_model2$summary)),c("mean", "2.5%", "97.5%")],
   model="NoIntegration,DetectionBUGS")
+# modelo 2 BUGS - deteccao GLM
+m2B<-cbind(
+  out_model2B$summary[grep("BETA",rownames(out_model2B$summary)),c("mean", "2.5%", "97.5%")],
+  model="NoIntegration,DetectionBUGS(AlternativeDet)")
 # model 3 
 m3<-cbind (coef(model3),
        confint (model3),
@@ -44,12 +51,22 @@ m3B<-cbind(
 m4 <- cbind(
   model4$summary[grep("BETA",rownames(model4$summary)),c("mean", "2.5%", "97.5%")],
   model="Integration,DetectionBUGS")
+# modelo4
+m4_sppOcc <- data.matrix(
+  
+  cbind (rbind (apply (model4_spOcc$beta.samples,2,mean)[1],
+                apply (model4_spOcc$beta.samples,2,mean)[2],
+                apply (model4_spOcc$beta.samples,2,mean)[3]),
+    
+          t(apply (model4_spOcc$beta.samples,2,quantile,probs = c(0.025, 0.975))),
+  model="Integration,DetectionSpOcc"))
 
 # colocar o mesmo nome de coluna em todos
-colnames(m1)<- colnames(m2)<-colnames(m2B)<-colnames(m3)<-colnames(m3B)<-colnames(m4)
+colnames(m4_sppOcc)<-colnames(m1)<- colnames(m2)<-colnames(m2B)<-colnames(m3)<-colnames(m3B)<-colnames(m4)
+
 
 # rbind 
-df_coeficientes <- rbind(m1,m2,m2B,m3,m3B,m4)
+df_coeficientes <- rbind(m1,m2,m2B,m3,m3B,m4, m4_sppOcc)
 df_coeficientes <- data.frame(df_coeficientes,
                          coeficientes=rownames(df_coeficientes))
 df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="campo")]<- "CAMPO"
@@ -61,6 +78,9 @@ df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="psi(campo)")]
 df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="psi(Int)")]<- "INTERCEPTO"
 df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="(Intercept)")]<- "INTERCEPTO"
 df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="BETA0")]<- "INTERCEPTO"
+df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="grassland")]<- "CAMPO"
+df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="agriculture")]<- "AGRI"
+
 # ajustar nomes das colunas
 colnames(df_coeficientes) <- c("mean","lower","upper","model","Coeficientes")
 # transformar em numero
@@ -74,8 +94,10 @@ df_coeficientes$model<-factor(df_coeficientes$model,
                                         "Integration(Aggregation),NoDetection",
                                         "Integration(Aggregation),NoDetectionBUGS",
                                         "NoIntegration,Detection",
+                                        "NoIntegration,DetectionBUGS(AlternativeDet)",
                                         "NoIntegration,DetectionBUGS",
-                                        "Integration,DetectionBUGS"))
+                                        "Integration,DetectionBUGS",
+                                        "Integration,DetectionSpOcc"))
 
 # plotar para ver os coeficientes
 pd=position_dodge(0.5) # jitter coeff
@@ -196,9 +218,12 @@ out_model2$summary[grep("ALPHA",rownames(out_model2$summary)),]
 sum(predictions_m1)
 sum(predictions_m2)
 (out_model2$mean$fs.z)*497
+(out_model2B$mean$fs.z)*497
 sum(predictions_m3)
 sum(model3_bugs$mean$psi)
 sum(model4$mean$fs.z)*497
+mean(plogis(model4_spOcc$beta.samples[,1]))*497
+sum(model4_cross$mean$fs.z)*497
 
 # ----------------
 # Mapeamento
@@ -537,3 +562,4 @@ grid.arrange(c_m1,
 
 dev.off()
 
+# end

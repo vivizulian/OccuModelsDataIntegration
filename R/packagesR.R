@@ -33,6 +33,7 @@ library(lattice)
 # pacotes para carregar output MCMC
 require(jagsUI)
 require(R2WinBUGS)
+library(coda)
 
 # pacote para correlation plot
 require(corrplot)
