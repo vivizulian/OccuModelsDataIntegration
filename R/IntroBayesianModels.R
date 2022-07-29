@@ -13,8 +13,8 @@
 #The same data set is analyzed using unmarked package and jagsUI package, in a bayesian framework.
 
 #If you do not have the jagsUI installed in your R, run:
-install.packages("jagsUI")
-
+#install.packages("jagsUI")
+require(jagsUI)
 
 ####___________1) Occupancy models (Chapter 10)_______________####
 
@@ -69,9 +69,7 @@ model {
     z[i] ~ dbern(psi) # State model
     for (j in 1:J) { # Loop over replicate surveys
       y[i,j] ~ dbern(z[i]*p) # Observation model (only JAGS !)
-      # y[i,j] ~ dbern(mu[i]) # For WinBUGS define 'straw man'
     }
-    # mu[i] <- z[i]*p # Only WinBUGS
   }
 }
 ",fill = TRUE)
@@ -85,13 +83,26 @@ inits <- function(){list(z = zst)}
 params <- c("psi", "p")
 
 # MCMC settings
-ni <- 50 ; nt <- 2 ; nb <- 10 ; nc <- 3; na=2
+ni <- 5000 ; nt <- 10 ; nb <- 1 ; nc <- 3; na <- 20
 
 # Call JAGS and summarize posteriors
-library(jagsUI)
+#library(jagsUI)
 out1 <- jags(data, inits, params, "model1.txt", n.chains = nc,
             n.thin = nt, n.iter = ni, n.burnin = nb)
 print(out1, dig = 3)
+
+# high density interval
+require(coda)
+hpd_vals <- HPDinterval(as.mcmc(out1$sims.list$psi), 
+                        prob=0.95)
+
+
+# 
+
+pA <- out1$sims.list$psi[which(out1$sims.list$psi >= 0.78 & 
+                                out1$sims.list$psi <= 0.82)] 
+length(pA)/length(out1$sims.list$psi)
+
 
 ## Plot the chains:
 library(mcmcOutput)
@@ -113,7 +124,7 @@ vegHt <- sort(runif(M, -1, 1)) # Sort for graphical convenience
 beta0 <- 0 # Logit-scale intercept
 beta1 <- 3 # Logit-scale slope for vegHt
 psi <- plogis(beta0 + beta1 * vegHt) # Occupancy probability
-# plot(vegHt, psi, ylim = c(0,1), type = "l", lwd = 3) # Plot psi relationship
+plot(vegHt, psi, ylim = c(0,1), type = "l", lwd = 3) # Plot psi relationship
 
 # Now visit each site and observe presence/absence perfectly
 z <- rbinom(M, 1, psi) # True presence/absence
@@ -125,7 +136,7 @@ wind <- array(runif(M * J, -1, 1), dim = c(M, J))
 alpha0 <- -2 # Logit-scale intercept
 alpha1 <- -3 # Logit-scale slope for wind
 p <- plogis(alpha0 + alpha1 * wind) # Detection probability
-# plot(p ~ wind, ylim = c(0,1)) # Look at relationship
+plot(p ~ wind, ylim = c(0,1)) # Look at relationship
 
 # Take J [ 3 presence/absence measurements at each site
 for(j in 1:J) {
@@ -136,7 +147,7 @@ for(j in 1:J) {
 #### 1E) Run using package unmarked ####
 
 # Load unmarked, format data and summarize
-library(unmarked)
+#library(unmarked)
 umf <- unmarkedFrameOccu(y = y, # Pres/Abs measurements
                          siteCovs = data.frame(vegHt = vegHt), # site-specific covs.
                          obsCovs = list(wind = wind)) # obs-specific covs.
@@ -171,8 +182,7 @@ model {
     
     # Observation model for the actual observations
     for (j in 1:J) {
-      y[i,j] ~ dbern(p.eff[i,j]) # Detection-nondetection at i and j
-      p.eff[i,j] <- z[i] * p[i,j] # 'straw man' for WinBUGS
+      y[i,j] ~ dbern(z[i] * p[i,j]) # Detection-nondetection at i and j
       logit(p[i,j]) <- alpha0 + alpha1 * wind[i,j]
     }
   }
@@ -195,7 +205,7 @@ params <- c("alpha0", "alpha1", "beta0", "beta1", "N.occ", "psi.fs", "p", "z",
 
 # MCMC settings
 ni <- 2500 ; nt <- 10 ; nb <- 2000 ; nc <- 3
-#ni <- 25000 ; nt <- 10 ; nb <- 2000 ; nc <- 3
+ni <- 25000 ; nt <- 10 ; nb <- 2000 ; nc <- 3
 
 # Call WinBUGS from R (ART 2 min) and summarize posteriors
 out2 <- jags(data, inits, params, "model2.txt", n.chains = nc,
@@ -205,6 +215,13 @@ print(out2, dig = 3)
 ## Plot the chains to check convergence:
 library(mcmcOutput)
 mcmcOutput::diagPlot(out2, params = c("alpha1","beta1", "beta0", "alpha0"))
+
+
+
+# probabilidade que o numero de sitios ocupados eh maior que 50 sitios
+sum(out2$sims.list$N.occ > 50 & out2$sims.list$N.occ < 70)/length(out2$sims.list$N.occ)
+
+
 
 
 
