@@ -14,3 +14,12 @@ Data: 28 - 31/07/2022
 Local: Espaço Multidisciplinar da Universidade Federal de Santa Maria
 
 Cidade: Silveira Martins, RS
+
+Links interessantes:
+
+Link para o livro 'R for Data Science': https://r4ds.had.co.nz/
+
+Tutorial para conectar o GitHub ao R: https://rfortherestofus.com/2021/02/how-to-use-git-github-with-r/
+
+
+
