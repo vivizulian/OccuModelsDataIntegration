@@ -34,8 +34,8 @@
 
         e1[i] <- ALPHA.GBIF * nSP.gbif [i]
         P1[i] <- 1-pow((1-0.5), e1[i])
-        zP1[i] <- P1[i] * z [i]
-        y.gbif [i] ~ dbern(zP1[i])
+        zP1[i] <- P1[i] * z[i]
+        y.gbif[i] ~ dbern(zP1[i])
 
 
     }
@@ -49,12 +49,12 @@
       for (j in 1:nrepEB) { # n checklists
 
         e2[i,j] <- ALPHA.DIST * dist [i,j] +
-                   ALPHA.DURATION * duration [i,j] +
-                   ALPHA.OBSERVER * observer [i,j]
+                   ALPHA.DURATION * duration[i,j] +
+                   ALPHA.OBSERVER * observer[i,j]
  
         P2[i,j] <- 1-pow((1-0.5), e2[i,j])
-        zP2[i,j] <- P2[i,j] * z [i]
-        yEB [i,j] ~ dbern(zP2[i,j])
+        zP2[i,j] <- P2[i,j] * z[i]
+        yEB[i,j] ~ dbern(zP2[i,j])
 
       }
     }
@@ -69,7 +69,7 @@
     
         e5[i] <- ALPHA.PICT * nPIC.wikiaves [i] + ALPHA.SONG * nSONG.wikiaves [i]
         P5[i] <- 1-pow((1-0.5), e5[i])
-        zP5[i] <- P5[i] * z [i]
+        zP5[i] <- P5[i] * z[i]
         y.wikiaves [i] ~ dbern (zP5[i])
     
     }

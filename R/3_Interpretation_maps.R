@@ -35,22 +35,27 @@ m2<-cbind( coef(model2,"state"),
 m2Bugs<-cbind(
   out_model2$summary[grep("BETA",rownames(out_model2$summary)),c("mean", "2.5%", "97.5%")],
   model="NoIntegration,DetectionBUGS")
+
 # modelo 2 BUGS - deteccao GLM
 m2B<-cbind(
   out_model2B$summary[grep("BETA",rownames(out_model2B$summary)),c("mean", "2.5%", "97.5%")],
   model="NoIntegration,DetectionBUGS(AlternativeDet)")
+
 # model 3 
 m3<-cbind (coef(model3),
        confint (model3),
        model = "Integration(Aggregation),NoDetection")
+
 # m3 bugs
 m3B<-cbind(
   model3_bugs$summary[grep("BETA",rownames(model3_bugs$summary)),c("mean", "2.5%", "97.5%")],
   model="Integration(Aggregation),NoDetectionBUGS")
+
 # modelo4
 m4 <- cbind(
   model4$summary[grep("BETA",rownames(model4$summary)),c("mean", "2.5%", "97.5%")],
   model="Integration,DetectionBUGS")
+
 # modelo4
 m4_sppOcc <- data.matrix(
   
@@ -83,6 +88,7 @@ df_coeficientes$coeficientes [which(df_coeficientes$coeficientes=="agriculture")
 
 # ajustar nomes das colunas
 colnames(df_coeficientes) <- c("mean","lower","upper","model","Coeficientes")
+
 # transformar em numero
 df_coeficientes$mean <- as.numeric(df_coeficientes$mean)
 df_coeficientes$lower <- as.numeric(df_coeficientes$lower)
@@ -156,7 +162,7 @@ range(predictions_m2$Predicted)
 # -----------------------------------------------
 #           modelo 2 bugs
 
-predictions_m2B <- out_model2$mean$z
+predictions_m2B <- out_model2$mean$psi
 
 # -----------------------------------------------
 #           modelo 3 
@@ -173,18 +179,20 @@ range((predictions_m3))
 #         model 3 bugs
 predictions_m3B <- model3_bugs$mean$psi
 
+
+
 # -------------------------------
 #         model 4 bugs
-predictions_m4B <- model4$mean$z
+predictions_m4B <- model4$mean$psi
 
 
 # histograma comparando predicoes
-hist((predictions_m1),xlim=c(0,1),
+hist((predictions_m1),xlim=c(0,1),ylim = c(0,500),
      col=rgb(0,1,1,alpha=0.4),main="Histograma das predicoes")
 hist(predictions_m2$Predicted,add=T,
      col=rgb(1,1,0,alpha=0.4))
 hist(predictions_m2B,add=T,
-     col=rgb(1,0.5,0,alpha=0.4))
+     col=rgb(1,0.5,0,alpha=0.4),breaks = c(seq(0,1,0.1)))
 hist(predictions_m3,add=T,
      col=rgb(0.5,0.5,0,alpha=0.4))
 hist(predictions_m3B,add=T,
@@ -225,6 +233,8 @@ sum(model4$mean$fs.z)*497
 mean(plogis(model4_spOcc$beta.samples[,1]))*497
 sum(model4_cross$mean$fs.z)*497
 
+sum(model4_cross$sims.list$fs.z > 0.25)/length(model4_cross$sims.list$fs.z)
+
 # ----------------
 # Mapeamento
 
@@ -235,6 +245,7 @@ shape_RS <- readOGR(dsn=here("data","shape_munRS"),
 
 ## obter os lagos para pinta-los com cores diferentes depois
 lagos <- shape_RS [c(96,250),]
+
 ## remover os lagos
 shape_RS <- shape_RS [-c(96,250),]
 
