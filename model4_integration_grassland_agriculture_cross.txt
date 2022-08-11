@@ -45,7 +45,7 @@
 
         e6[i] <- ALPHA.GBIF * nSP.gbif6[i]
         P6[i] <- 1-pow((1-0.5), e6[i])
-        zP6[i] <- P6[i] * z [i]
+        zP6[i] <- P6[i] * z[i]
         y.gbif6 [i] ~ dbern(zP6[i])
 
     }

@@ -275,6 +275,7 @@ save (model2,
 
 # proporcao de municipios ocupados
 plogis(coef(model2,"state")[1])
+plogis(coef(model2,"det")[1])
 
 # ------------------------------------------------------ #
 # modelo 2 em linguagem bugs
@@ -282,7 +283,7 @@ plogis(coef(model2,"state")[1])
 
 # GLOBAL MCMC settings
 ## short form
-# na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
+na <- 30; nb <- 40; ni <- 50; nc <- 3; nt <- 1
 na <- 3000; nb <- 4000; ni <- 5000; nc <- 3; nt <- 1
 
 
@@ -406,10 +407,11 @@ str(winbugs.data <- list(nsite= dim(y.ebird)[1],
 ))
 
 # parametros para monitorar nas MCMC
-params <- c("ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
-            "BETA0","BETA.CAMPO","BETA.AGRI",
+params <- c(#"ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
+            #"BETA0","BETA.CAMPO","BETA.AGRI",
             "z","psi","fs.z","p",
-            "bpvalue", "fit", "fit.new"
+            #"bpvalue", "fit", "fit.new", 
+            "yEB", "y.new"
     )
 
 
@@ -422,7 +424,7 @@ out_model2 <- bugs(data = winbugs.data,
                   n.thin = nt, 
                   n.iter = ni, 
                   n.burnin = nb,
-                  debug=F,
+                  debug=T,
                   codaPkg=F, 
                   DIC=TRUE, 
                   bugs.directory="C:/Program Files/WinBUGS14/", 
@@ -431,8 +433,9 @@ out_model2 <- bugs(data = winbugs.data,
 # save it
 save (out_model2,file=here("output", "out_model2_bugs.RData"))
 
-out_model2$mean$fs.z
-out_model2$mean$bpvalue
+length(out_model2$mean$psi)
+dim(out_model2$sims.list$yEB)
+sum(apply (y.ebird [,1:n_so_ebird]>=0,1,sum,na.rm=T)>0)
 
 # high density interval
 hpd_vals <- HPDinterval(as.mcmc(out_model2$sims.list$ALPHA.DIST), prob=0.95)
@@ -712,7 +715,7 @@ model3_bugs <- bugs(data = win.data,
                n.iter = ni, 
                n.burnin = nb,
                codaPkg=F, 
-               debug=T,
+               debug=F,
                DIC=TRUE, 
                bugs.directory="C:/Program Files/WinBUGS14/", 
                program= "WinBUGS"
@@ -767,10 +770,11 @@ cat("
     
     for (i in 1:nsite) {
 
+
         e1[i] <- ALPHA.GBIF * nSP.gbif [i]
         P1[i] <- 1-pow((1-0.5), e1[i])
-        zP1[i] <- P1[i] * z [i]
-        y.gbif [i] ~ dbern(zP1[i])
+        zP1[i] <- P1[i] * z[i]
+        y.gbif[i] ~ dbern(zP1[i])
 
 
     }
@@ -784,12 +788,12 @@ cat("
       for (j in 1:nrepEB) { # n checklists
 
         e2[i,j] <- ALPHA.DIST * dist [i,j] +
-                   ALPHA.DURATION * duration [i,j] +
-                   ALPHA.OBSERVER * observer [i,j]
+                   ALPHA.DURATION * duration[i,j] +
+                   ALPHA.OBSERVER * observer[i,j]
  
         P2[i,j] <- 1-pow((1-0.5), e2[i,j])
-        zP2[i,j] <- P2[i,j] * z [i]
-        yEB [i,j] ~ dbern(zP2[i,j])
+        zP2[i,j] <- P2[i,j] * z[i]
+        yEB[i,j] ~ dbern(zP2[i,j])
 
       }
     }
@@ -804,7 +808,7 @@ cat("
     
         e5[i] <- ALPHA.PICT * nPIC.wikiaves [i] + ALPHA.SONG * nSONG.wikiaves [i]
         P5[i] <- 1-pow((1-0.5), e5[i])
-        zP5[i] <- P5[i] * z [i]
+        zP5[i] <- P5[i] * z[i]
         y.wikiaves [i] ~ dbern (zP5[i])
     
     }
@@ -855,12 +859,14 @@ inits <- function() {list(z = rep (1, nrow(y.ebird)),
                          ALPHA.OBSERVER = rnorm (1,mean=2))}
 
 
-params <- c("BETA0", 
-            "BETA.CAMPO","BETA.AGRI",
-            "ALPHA.GBIF","ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
-            "ALPHA.PICT", "ALPHA.SONG", 
-            "muP1","muP2","muP5",
-            "z","psi","fs.z"
+params <- c(#"BETA0", 
+            #"BETA.CAMPO","BETA.AGRI",
+            #"ALPHA.GBIF","ALPHA.DIST", "ALPHA.DURATION","ALPHA.OBSERVER",
+            #"ALPHA.PICT", "ALPHA.SONG", 
+            #"muP1","muP2","muP5",
+            "z","psi","fs.z", 
+            #"y.wikiaves", 
+            "yEB", "y.gbif" 
 )
 
 model4 <- bugs(data = win.data, 
@@ -873,7 +879,7 @@ model4 <- bugs(data = win.data,
                               n.burnin = nb,
                               codaPkg=F, 
                               DIC=TRUE, 
-                              debug=F,
+                              debug=T,
                               bugs.directory="C:/Program Files/WinBUGS14/", 
                               program= "WinBUGS"
                               )
@@ -883,6 +889,12 @@ save (model4,file=here("output", "model4_bugs.RData"))
 
 
 model4$mean$fs.z
+model4$sims.list$
+
+hist (model4$sims.list$fs.z)
+abline(v=model4$mean$fs.z,lwd=3)
+
+sum(model4$sims.list$fs.z > 0.22) / length(model4$sims.list$fs.z)
 
 # Pstar
 source ('R/4_Pstar.R')
@@ -902,6 +914,7 @@ y <- list (dados_det_ema_gbif[,"det"],
            #ifelse (apply (y.ebird,1,sum,na.rm=T)>0,1,apply (y.ebird,1,sum,na.rm=T))
            y.ebird [which(rowSums(is.na(y.ebird[,1:11])) < 11),1:11]
            )
+
 # list of sites           
 sites <- list (seq (1,length(rownames(dados_det_ema_gbif))),
                seq (1,length(rownames(dados_det_ema_gbif))),
@@ -937,11 +950,12 @@ inits <- list(z = rep (1, length(sites[[1]])),
               )
 
 # Priors
-prior.list <- list(beta.normal = list(mean = 0, var = 2.72), 
-                   alpha.normal = list(mean = list(0, 0, 0), 
-                                       var = list(2.72, 2.72, 2.72)))
-# using the spOccupancy package of R
+prior.list <- list(beta.normal = list(mean = 0, var = 2.72),  # priors de parametros do modelo psi
+                   alpha.normal = list(mean = list(0, 0, 0),  # priors de paramentros do modelo p
+                                       var = list(2.72, 2.72, 2.72))) # 
 
+
+# using the spOccupancy package of R
 model4_spOcc <- intPGOcc(occ.formula = ~ grassland+agriculture, 
                          det.formula = list (f.1 = ~ nSP.gbif,
                                              f.2 = ~ nPIC.wikiaves+nSONG.wikiaves,
@@ -1050,7 +1064,7 @@ cat("
 
         e6[i] <- ALPHA.GBIF * nSP.gbif6[i]
         P6[i] <- 1-pow((1-0.5), e6[i])
-        zP6[i] <- P6[i] * z [i]
+        zP6[i] <- P6[i] * z[i]
         y.gbif6 [i] ~ dbern(zP6[i])
 
     }
@@ -1216,7 +1230,9 @@ Yhat3 <- model4_cross$mean$yEB10
 ## Deviance em cada base de dados:
 # GBIF
 likhood <- (Yhat^Ytruth)*((1-Yhat)^(1-Ytruth))
-DEV <- -(2*(sum(log(likhood))))
+lokLik<- log(likhood)
+lokLik <- lokLik[is.infinite(lokLik) == F]
+DEV <- -(2*(sum((lokLik))))
 
 # Wikiaves
 likhood2 <- (Yhat2^Ytruth2)*((1-Yhat2)^(1-Ytruth2))
@@ -1226,9 +1242,9 @@ DEV2 <- -(2*(sum(lokLik2)))
 
 # eBird
 likhood3 <- (Yhat3^Ytruth3)*((1-Yhat3)^(1-Ytruth3))
-lokLik3<- log(likhood3)
-lokLik3 <- lokLik3[is.na(lokLik3) == F]
-DEV3 <- -(2*(sum(lokLik3)))
+lokLik3<- log(likhood3+0.0001)
+#lokLik3 <- lokLik3[is.infinite(lokLik3) == F]
+DEV3 <- -(2*(sum(lokLik3,na.rm=T)))
 
 # Deviance total:
 DEVtotal <- DEV + DEV2 + DEV3 # valor que deve ser comparado entre modelos.
@@ -1240,21 +1256,24 @@ DEVtotal <- DEV + DEV2 + DEV3 # valor que deve ser comparado entre modelos.
 
 # gbif
 roc(Ytruth, Yhat)
+
 # wikiaves
 roc(Ytruth2, Yhat2)
+
 # eBird
 roc(as.numeric(Ytruth3), as.numeric(Yhat3))
 
 # plot GBIF
 plot(roc(Ytruth, Yhat), main = "Full Model")
-mtext(text = paste ("AUC=",round (roc(estpred[,1], estpred[,2])$auc,2)), side=1)
+mtext(text = paste ("AUC GB=",round (roc(Ytruth, Yhat)$auc,2)), side=1)
+
 # plot WikiAves
 plot(roc(Ytruth2, Yhat2), main = "Full Model")
-mtext(text = paste ("AUC=",round (roc(Ytruth2, Yhat2)$auc,2)), side=1)
+mtext(text = paste ("AUC WA=",round (roc(Ytruth2, Yhat2)$auc,2)), side=1)
 
 # plot eBird
 plot(roc(as.numeric(Ytruth3), as.numeric(Yhat3)), main = "Full Model")
-mtext(text = paste ("AUC=",round (roc(as.numeric(Ytruth3), as.numeric(Yhat3))$auc,2)), side=1)
+mtext(text = paste ("AUC EB=",round (roc(as.numeric(Ytruth3), as.numeric(Yhat3))$auc,2)), side=1)
 
 
 rm(list=ls())

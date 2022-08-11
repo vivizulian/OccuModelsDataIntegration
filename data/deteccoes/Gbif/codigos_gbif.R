@@ -169,7 +169,7 @@ f.mun_SR<- cbind (f.mun,
 c_SR <-    ggplot() + geom_polygon(data=f.mun_SR, aes(x=long, y=lat, group=group, 
                                                   color=Nespecies, 
                                              fill=Nespecies), colour = NA, size=1) + 
-    labs (title= "Riqueza de pássaros do RS")+
+    labs (title= "Riqueza de aves do RS")+
     scale_fill_gradient2 (low='white', high='darkred', midpoint= 50,na.value = "white",
                           limits=c(0,max(cores_SR$cores)), 
                           breaks=seq(0,max(cores_SR$cores,na.rm=T),by=50),
@@ -186,3 +186,4 @@ save (dados_det_ema_gbif, file= here("data",
                                      "organized_data",
                                      "input_GBIF.RData"))
 rm(list=ls())
+S
