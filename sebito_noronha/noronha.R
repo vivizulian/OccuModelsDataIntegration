@@ -253,26 +253,26 @@ ebird_data <- ebird_data %>% #select (LATITUDE, LONGITUDE, SCIENTIFIC.NAME) %>%
 
 
 # create a grid to have sites
-res_raster<- 0.01 # latlong degrees
-
-# based on the extent of extracted data
-grd_df <- expand.grid(x = seq(from = (extent(noronha))[1]-0.01,                                           
-                              to = (extent(noronha))[2]+0.01,
-                              by = res_raster),
-                      y = seq(from = (extent(noronha))[3]-0.01,                                           
-                              to = (extent(noronha))[4]+0.01,
-                              by = res_raster))  # expand points to grid
-
-# points object
-coordinates(grd_df) <- ~x + y
-
-# Sp points into raster
-grd_raster <- (raster(grd_df,resolution = res_raster))
-
-crs(grd_raster) <- crs(noronha)
-
-# define values
-values(grd_raster) <- rnorm (length(values(grd_raster)))
+# res_raster<- 0.01 # latlong degrees
+# 
+# # based on the extent of extracted data
+# grd_df <- expand.grid(x = seq(from = (extent(noronha))[1]-0.01,                                           
+#                               to = (extent(noronha))[2]+0.01,
+#                               by = res_raster),
+#                       y = seq(from = (extent(noronha))[3]-0.01,                                           
+#                               to = (extent(noronha))[4]+0.01,
+#                               by = res_raster))  # expand points to grid
+# 
+# # points object
+# coordinates(grd_df) <- ~x + y
+# 
+# # Sp points into raster
+# grd_raster <- (raster(grd_df,resolution = res_raster))
+# 
+# crs(grd_raster) <- crs(noronha)
+# 
+# # define values
+# values(grd_raster) <- rnorm (length(values(grd_raster)))
 
 
 # load elevation map
