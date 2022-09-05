@@ -8,7 +8,7 @@
 
     # PRIORS
     BETA0 ~ dunif(-10,10)
-    BETA.ALT ~ dunif(-10, 10)
+    BETA.ALT ~ dunif(-10,10)
     
     
     # LIKELIHOOD
@@ -16,11 +16,11 @@
 
       z[i] ~ dbern(psi[i]) # True occupancy z at site i
   
-      mu[i] <- BETA0 + BETA.ALT * altitude [i]
+      mu[i] <- BETA0 + BETA.ALT * altitude[i]
 
-     # Keeping Winbugs on the track
-     mu.lim[i] <- min(10, max(-10, mu[i]))  
-     logit(psi[i]) <- mu.lim[i]
+      # Keeping Winbugs on the track
+      mu.lim[i] <- min(10, max(-10, mu[i]))  
+      logit(psi[i]) <- mu.lim[i]
 
     }    
 
@@ -30,73 +30,53 @@
 
     ### GBIF 
     
-    for (i in 1:nsite) {
+    for (l in 1:nObsGB) {
 
 
-        e1[i] <- ALPHA.GBIF * nSP.gbif [i]
-        P1[i] <- 1-pow((1-0.5), e1[i])
-        zP1[i] <- P1[i] * z[i]
-        y.gbif[i] ~ dbern(zP1[i])
-
-
-    }
-
-    # PRIOR FOR RICHNESS EFFECT
-    ALPHA.GBIF ~ dnorm(0,0.0001)I(0,1000)# truncated in positive values
-    
-    
-    ### VERTNET 
-    
-    for (i in 1:nsite) {
-
-
-        e2[i] <- ALPHA.VERTNET * nSP.vertnet [i]
-        P2[i] <- 1-pow((1-0.5), e2[i])
-        zP2[i] <- P2[i] * z[i]
-        y.vertnet[i] ~ dbern(zP2[i])
+        e1[l] <- ALPHA.GBIF * nSP.gbif[l]
+        P1[l] <- 1-pow((1-0.5), e1[l])
+        zP1[l] <- P1[l] * z[siteGB[l]]
+        y.gbif[l] ~ dbern(zP1[l])
 
 
     }
 
     # PRIOR FOR RICHNESS EFFECT
-    ALPHA.VERTNET ~ dnorm(0,0.0001)I(0,1000)# truncated in positive values
-    
+    ALPHA.GBIF ~ dnorm(0,0.0001)I(0,10000)# truncated in positive values
     
     
     ### INATURALIST 
     
-    for (i in 1:nsite) {
+    for (r in 1:nObsIN) {
 
 
-        e3[i] <- ALPHA.VERTNET * nSP.inat [i]
-        P3[i] <- 1-pow((1-0.5), e3[i])
-        zP3[i] <- P3[i] * z[i]
-        y.inat[i] ~ dbern(zP3[i])
+        e3[r] <- ALPHA.INAT * nSP.inat[r]
+        P3[r] <- 1-pow((1-0.5), e3[r])
+        zP3[r] <- P3[r] * z[siteIN[r]]
+        y.inat[r] ~ dbern(zP3[r])
 
 
     }
 
     # PRIOR FOR RICHNESS EFFECT
-    ALPHA.INAT ~ dnorm(0,0.0001)I(0,1000)# truncated in positive values
+    ALPHA.INAT ~ dnorm(0,0.0001)I(0,10000)# truncated in positive values
     
     
     ## EBIRD
   
-    for (i in 1:nsite) {
-      for (j in 1:nrepEB) { # n checklists
+    for (n in 1:nObsEB) {
 
-        e4[i,j] <- ALPHA.DIST * dist [i,j] +
-                   ALPHA.DURATION * duration[i,j] 
-        P4[i,j] <- 1-pow((1-0.5), e4[i,j])
-        zP4[i,j] <- P4[i,j] * z[i]
-        yEB[i,j] ~ dbern(zP4[i,j])
+        e4[n] <- ALPHA.DIST * dist [n] + ALPHA.DURATION * duration[n] + ALPHA.SP * nSP.eb[n]
+        P4[n] <- 1-pow((1-0.5), e4[n])
+        zP4[n] <- P4[n] * z[siteEB[n]]
+        yEB[n] ~ dbern(zP4[n])
 
-      }
     }
     
-    ALPHA.DIST ~ dnorm(0,0.0001)I(0,1000)
-    ALPHA.DURATION ~ dnorm(0,0.0001)I(0,2000)
-    
+    ALPHA.DIST ~ dnorm(0,0.0001)I(0,10000)
+    ALPHA.DURATION ~ dnorm(0,0.0001)I(0,10000)
+    ALPHA.SP ~ dnorm(0,0.0001)I(0,10000)
+  
 
     ##############################
     #### DERIVED PARAMETERS ######
@@ -104,9 +84,9 @@
     
     #compute the mean detection probability of each dataset: 
     muP1 <- mean(P1[])
-    muP2 <- mean(P2[])
+    #muP2 <- mean(P2[])
     muP3 <- mean(P3[])
-    muP4 <- mean(P4[,])
+    muP4 <- mean(P4[])
     
     
     ## Number of occupied municipalities (finite sample size)
