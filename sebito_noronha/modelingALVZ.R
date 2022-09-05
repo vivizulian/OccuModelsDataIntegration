@@ -162,7 +162,7 @@ model_output <- bugs(data = data,
 
 
 # save it
-save (model_output, file=here("output", "model_output.RData"))
+save (model_output, file="model_output.RData")
 
 
 
